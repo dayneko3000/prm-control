@@ -1,0 +1,3 @@
+/home/roman/NetBeansProjects/Diploma/dist/Debug/GNU-Linux/rd/
+/home/roman/NetBeansProjects/Diploma/dist/Debug/GNU-Linux/md/
+/home/roman/NetBeansProjects/Diploma/dist/Debug/GNU-Linux/prm.dblite
