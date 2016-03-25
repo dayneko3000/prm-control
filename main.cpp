@@ -23,6 +23,9 @@ static int print_callback(void *notused, int coln, char **rows, char **colnm)
     cout << "| ";
     for (int i = 0; i < coln; i ++)
     {
+        if (string(colnm[i]) == "prms")
+            cout << string(colnm[i]) + " = " + string(rows[i]) + " = "  + bitset<30>(atoi(rows[i])).to_string() << " |";
+        else
             cout << string(colnm[i]) + " = " + string(rows[i]) + " | ";
     }
     cout << endl;
@@ -45,8 +48,8 @@ static int callback(void *notused, int coln, char **rows, char **colnm)
     return 0;
 }
 
-int get_op_num(const string op){
-    
+int get_op_num(const string op)
+{
     if (operations.find(op) == operations.end())
         return -1;
     else
@@ -88,11 +91,6 @@ int configure(char *db_path)
     mountdir = res[0];
     rootdir = res[1];
     
-    if (mountdir[mountdir.length() - 1] != '/')
-        mountdir += "/";
-    if (rootdir[rootdir.length() - 1] != '/')
-        rootdir += "/";
-    
     return 0;
 }
 
@@ -126,6 +124,11 @@ int check_uid(string uid)
 
 int check_prms(string prms)
 {
+    if (prms.length() != 30)
+    {
+        cout << "Wrong permission mask" << endl;
+        return 0;
+    }
     for (int i = 0; i < prms.length(); i ++)
     {
         if (prms[i] != '0' && prms[i] != '1')
@@ -179,8 +182,9 @@ int set(int n, char **argv)
     
     if (!check_path(path) || !check_uid(uid) || !check_prms(prms))
         return 0;
-    
-    string query = "insert or replace into prm_list values(\"" + path +"\", " + uid + ", \"" + prms + "\");";
+    char prm[30];
+    sprintf(prm, "%d",  bitset<30>(prms).to_ulong());
+    string query = "insert or replace into prm_list values(\"" + path +"\", " + uid + ", " + string(prm) + ");";
     char *err = 0;
     if (!(sqlite3_exec(db, query.c_str(), 0, 0, &err) == SQLITE_OK))
     {
@@ -200,7 +204,7 @@ int get_new_prm(int prm, int bit, int op)
     }
     else
     {
-        if (prm & bit == prm)
+        if (prm & bit != 0)
             return prm - bit;
         else
             return prm;
@@ -223,11 +227,11 @@ int change(int n, char **argv)
     for (int i = 3; i < n; i++)
     {
         op = string(argv[i]);
-        int prm = op[0] == '+' ? 1 : 0;
+        int prm = op[0] == '+';
         op.erase(0, 1);
         int op_num = get_op_num(op);
         
-        if(op_num == -1 || (prm != '+' && prm != '-'))
+        if(op_num == -1)
             continue;
         
         string query = "select exists(select * from prm_list where path = \"" + path + "\" and uid = " + uid + ");";
@@ -290,13 +294,16 @@ int main(int argc, char **argv)
     
     configure(argv[0]);
     
-    if (comands.find(string(argv[1])) == comands.end())
+    argv++;
+    argc--;
+    
+    if (comands.find(string(argv[0])) == comands.end())
     {
         cout << "Undefined operation" << endl;
         return 0;
     }
     
-    switch (comands[string(argv[1])])
+    switch (comands[string(argv[0])])
     {
         case 0:
             return help();

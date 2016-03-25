@@ -21,6 +21,7 @@
 #include <exception>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <bitset>
 
 #ifndef CONFIG_H
 #define CONFIG_H
