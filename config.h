@@ -30,14 +30,15 @@
 extern "C" {
 #endif
 
+#define QUERY_MAX 1000
+#define PRM_MAX 50    
     
-    
-std::map<std::string, int> operations = {{"getattr", 1 << 0},{"readlink", 1 << 1},{"mknod", 1 << 2},{"mkdir", 1 << 3},{"unlink", 1 << 4},
-                            {"rmdir", 1 << 5},{"symlink", 1 << 6},{"rename", 1 << 7},{"link", 1 << 8},{"chmod", 1 << 9},
-                            {"chown", 1 << 10},{"truncate", 1 << 11},{"utime", 1 << 12},{"open", 1 << 13},{"read", 1 << 14},
-                            {"write", 1 << 15},{"statfs", 1 << 16},{"flush", 1 << 17},{"release", 1 << 18},{"fsync", 1 << 19},
-                            {"opendir", 1 << 20},{"readdir", 1 << 21},{"releasedir", 1 << 22},{"fsyncdir", 1 << 23},{"init", 1 << 24},
-                            {"destroy", 1 << 25},{"access", 1 << 26},{"create", 1 << 27},{"ftruncate", 1 << 28},{"fgetattr", 1 << 29}};
+std::map<std::string, int> operations = 
+{{"execute", 1 << 0}, {"getattr", 1 << 1}, {"chmod", 1 << 2}, {"fsyncdir", 1 << 3}, {"truncate", 1 << 4},
+{"chown", 1 << 5}, {"fsync", 1 << 6}, {"utime", 1 << 7}, {"readlink", 1 << 8}, {"unlink", 1 << 9},
+{"symlink", 1 << 10}, {"rename", 1 << 11}, {"link", 1 << 12}, {"ftruncate", 1 << 13}, {"fgetattr", 1 << 14},
+{"open", 1 << 15}, {"read", 1 << 16}, {"write", 1 << 17}, {"statfs", 1 << 18}, {"rmdir", 1 << 19},
+{"mknod", 1 << 20}, {"mkdir", 1 << 21}, {"opendir", 1 << 22}, {"readdir", 1 << 23}, {"create", 1 << 24}};
 
 #ifdef __cplusplus
 }

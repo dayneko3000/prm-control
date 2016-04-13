@@ -18,20 +18,45 @@ using namespace std;
 sqlite3 *db = NULL;
 string rootdir, mountdir;
 
-static int print_callback(void *notused, int coln, char **rows, char **colnm)
+static int print_prm_callback(void *notused, int coln, char **rows, char **colnm)
 {
     cout << "| ";
     for (int i = 0; i < coln; i ++)
     {
-        if (string(colnm[i]) == "prms")
-            cout << string(colnm[i]) + " = " + string(rows[i]) + " = "  + bitset<30>(atoi(rows[i])).to_string() << " |";
-        else
+//        if (string(colnm[i]) == "prms")
+//            cout << string(colnm[i]) + " = " + string(rows[i]) + " = "  + bitset<27>(atoi(rows[i])).to_string() << " |";
+//        else
             cout << string(colnm[i]) + " = " + string(rows[i]) + " | ";
     }
     cout << endl;
     
     return 0;
 }
+
+static int print_callback(void *notused, int coln, char **rows, char **colnm)
+{
+    cout << "| ";
+    for (int i = 0; i < coln; i ++)
+    {
+//        if (string(colnm[i]) == "owner_prms" || string(colnm[i]) == "group_prms" || string(colnm[i]) == "other_prms")
+//            cout << string(colnm[i]) + " = " + string(rows[i]) + " = "  + bitset<27>(atoi(rows[i])).to_string() << " |";
+//        else
+            cout << string(colnm[i]) + " = " + string(rows[i]) + " | ";
+    }
+    cout << endl << "users:" << endl;
+    
+    char *err = NULL;
+    string query = "select id, prms from user_prm_list where file_id = " + string(rows[0]) + ";";
+    sqlite3_exec(db, query.c_str(), print_prm_callback, NULL, &err);
+    cout << "groups:" << endl;
+    query = "select id, prms from group_prm_list where file_id = " + string(rows[0]) + ";";
+    sqlite3_exec(db, query.c_str(), print_prm_callback, NULL, &err);
+    
+    cout << endl;
+    
+    return 0;
+}
+
 
 static int prm_callback(void *notused, int coln, char **rows, char **colnm)
 {
@@ -79,17 +104,21 @@ int configure(char *db_path)
     }
     
     char *err = NULL;
-    string query = "select * from dir_list;";
+    string query = "select path from config where id = 1;";
     string res[2] = {"",""};
     sqlite3_exec(db, query.c_str(), callback, res, &err);
     
-    if (res[0] == "" || res[1] == "" || err != NULL)
+    if (res[0] == "" || err != NULL)
     {
         cout << "Wrong path to database" << endl;
         abort();
     }
     mountdir = res[0];
-    rootdir = res[1];
+    
+    query = "select path from config where id = 2;";
+    sqlite3_exec(db, query.c_str(), callback, res, &err);
+    
+    rootdir = res[0];
     
     return 0;
 }
@@ -110,9 +139,9 @@ int check_path(string path)
 
 int check_uid(string uid)
 {
-    for (int i = 0; i < uid.length(); i++)
+    for (int i = 1; i < uid.length(); i++)
     {
-        if (!(isdigit(uid[i])||(i == 0 && uid[i] == '-')))
+        if (!(isdigit(uid[i])))
         {
             cout << "Wrong uid" << endl;
             return 0;
@@ -124,11 +153,11 @@ int check_uid(string uid)
 
 int check_prms(string prms)
 {
-    if (prms.length() != 30)
-    {
-        cout << "Wrong permission mask" << endl;
-        return 0;
-    }
+//    if (prms.length() != 30)
+//    {
+//        cout << "Wrong permission mask" << endl;
+//        return 0;
+//    }
     for (int i = 0; i < prms.length(); i ++)
     {
         if (prms[i] != '0' && prms[i] != '1')
@@ -142,11 +171,11 @@ int check_prms(string prms)
 }
 
 int show(int n, char **path){
-    string query, query2;
+    string query;
     char *err = 0;
     
     if (n < 2 || string(path[1]) == "all")
-        query = "select * from prm_list;";
+        query = "select id, path, uid, gid, owner_prms, group_prms, other_prms from file_list;";
     else
     {
         string p(path[1]);
@@ -154,16 +183,14 @@ int show(int n, char **path){
         if (!check_path(p))
             return 0;
         
-        query = "select * from prm_list where path =\"" + p + "\";";
-        query2 = "select * from prm_list where path =\"" + p + "/\";";
+        query = "select id, path, uid, gid, owner_prms, group_prms, other_prms from file_list where path =\"" + p + "\";";
     }
     
-    if (!(sqlite3_exec(db, query.c_str(), print_callback, 0, &err) == SQLITE_OK))
+    if (!(sqlite3_exec(db, query.c_str(), print_callback, NULL, &err) == SQLITE_OK))
     {
-        cout << "Wrong data base path in config.txt. Please try to reconfigure" << endl;
+        cout << "Wrong data base path" << endl;
         return 0;
     }
-    sqlite3_exec(db, query2.c_str(), print_callback, 0, &err);
     
     sqlite3_close(db);
 }
@@ -178,15 +205,29 @@ int set(int n, char **argv)
         return 0;
     }
     
-    string path(argv[1]), uid(argv[2]), prms(argv[3]);
+    string mode(argv[1]), path(argv[2]), uid(argv[3]), prms(argv[4]);
     
-    if (!check_path(path) || !check_uid(uid) || !check_prms(prms))
+    if (!check_path(path) || !check_prms(prms))
         return 0;
-    char prm[30];
-    sprintf(prm, "%d",  bitset<30>(prms).to_ulong());
-    string query = "insert or replace into prm_list values(\"" + path +"\", " + uid + ", " + string(prm) + ");";
+//    char prm[30];
+//    sprintf(prm, "%d",  bitset<30>(prms).to_ulong());
+    string query;
+    //query = "insert or replace into prm_list values(\"" + path +"\", " + uid + ", " + prms + ");";
+    if (mode == "-ow")
+        query = "update file_list set owner_prms = " + prms + " where path = " + path + ";";
+    else if(mode == "-gow")
+        query = "update file_list set group_prms = " + prms + " where path = " + path + ";";
+    else if(mode == "-oth")
+        query = "update file_list set other_prms = " + prms + " where path = " + path + ";";
+    else if(mode == "-g" && check_uid(uid))
+        query = "insert or replace into group_prm_list (file_id, id, prms) values((select id from file_list where path = \"" + path + "\"), " + uid + ", " + prms + ");";
+    else if (check_uid(uid))
+        query = "insert or replace into user_prm_list (file_id, id, prms) values((select id from file_list where path = \"" + path + "\"), " + uid + ", " + prms + ");";
+    else 
+        return 0;
+    
     char *err = 0;
-    if (!(sqlite3_exec(db, query.c_str(), 0, 0, &err) == SQLITE_OK))
+    if (!(sqlite3_exec(db, query.c_str(), NULL, NULL, &err) == SQLITE_OK))
     {
         cout << "Something went wrong" << endl;
         return 0;
@@ -204,72 +245,104 @@ int get_new_prm(int prm, int bit, int op)
     }
     else
     {
-        if (prm & bit != 0)
+        if ((prm & bit) != 0)
             return prm - bit;
         else
             return prm;
     }
 }
 
+int get_field(const char *file, const char *field)
+{
+    int result = 0;
+    char *err = NULL, *res = NULL, query[QUERY_MAX];
+
+    res = (char *)malloc(sizeof(char) * PRM_MAX);
+    
+    sprintf(query, "SELECT %s FROM file_list WHERE path = \"%s\"", field, file);
+    sqlite3_exec(db, query, prm_callback, res, &err);
+    result = atoi(res);
+    
+    free(res);
+    
+    return result;
+}
+
 int change(int n, char **argv)
 {
-    string path, uid, op;
+    string path, id, table, field, tfield;
     
     if (n < 3)
         return 0;
     
-    path = string(argv[1]);
-    uid = string(argv[2]);
+    path = string(argv[2]);
+    id = string(argv[1]);
     
-    if (!check_path(path) || !check_uid(uid))
-        return 0;
+    table = "file_list";
+    if (id == "-owner")
+        field = "owner_prms";
+    else if (id == "-group")
+        field = "group_prms";
+    else if(id == "-other")
+        field = "other_prms";
+    else if (n >= 5){
+        if (id == "-g"){
+            table = "group_prm_list";
+            field = "group_prms";
+            tfield = "gid";
+        }else{
+            table = "user_prm_list";
+            field = "owner_prms";
+            tfield = "uid";
+        }
+        id = argv[3];
+    }else return 0;
     
-    for (int i = 3; i < n; i++)
-    {
-        op = string(argv[i]);
-        int prm = op[0] == '+';
-        op.erase(0, 1);
-        int op_num = get_op_num(op);
-        
-        if(op_num == -1)
-            continue;
-        
-        string query = "select exists(select * from prm_list where path = \"" + path + "\" and uid = " + uid + ");";
-        char * res = new char[500], *err = 0;
-        if (sqlite3_exec(db, query.c_str(), prm_callback, res, &err) != SQLITE_OK)
-        {
-            continue;
-        }
-        
-        if (res[0] == '1')
-        {
-            query = "select * from prm_list where path = \"" + path + "\" and uid = " + uid + ";";
-            sqlite3_exec(db, query.c_str(), prm_callback, res, &err);
-            //res[op_num] = prm;
-            char *new_prm = new char [100];
-            sprintf(new_prm, "%d", get_new_prm(atoi(res), op_num, prm));
-            query = "update prm_list set prms = \"" + string(new_prm) + "\" where path = \"" + path + "\" and uid = " + uid + ";";
-            sqlite3_exec(db, query.c_str(), 0, 0, &err);
-        }
-        else
-        {
-            struct stat *statbuf = new struct stat;
-            lstat(argv[1], statbuf);
-            if (statbuf->st_uid == atoi(uid.c_str()))
-                query = "select * from prm_list where path = \"" + path + "\" and uid = -4;";
-            else
-                query = "select * from prm_list where path = \"" + path + "\" and uid = -5;";
+    if (table == "file_list"){
+        for (int i = 3; i < n; i ++){
+            string prm = argv[i];
+            prm.erase(0, 1);
+            if (operations.find(prm) == operations.end())
+                continue;
+            int op = argv[i][0] == '+';
+            int op_bit = operations[prm];
+            int old_permissions = get_field(path.c_str(), field.c_str());
             
-            delete statbuf;
-            
-            sqlite3_exec(db, query.c_str(), prm_callback, res, &err);
-            char *new_prm = new char [100];
-            sprintf(new_prm, "%d", get_new_prm(atoi(res), op_num, prm));
-            query = "insert or replace into prm_list values(\"" + path + "\", " + uid + ", \"" + string(new_prm) + "\");";
-            sqlite3_exec(db, query.c_str(), 0, 0, &err);
+            char *query = new char[QUERY_MAX], *err = NULL;
+            sprintf(query, "update file_list set %s = %d where path = \"%s\"", field.c_str(), get_new_prm(old_permissions, op_bit, op), path.c_str());
+            sqlite3_exec(db, query, NULL, NULL, &err);
+            delete [] query;
         }
-        
-        delete [] res;
+    }else{
+        for (int i = 4; i < n; i ++){
+            string prm = argv[i];
+            prm.erase(0, 1);
+            if (operations.find(prm) == operations.end())
+                continue;
+            int op = argv[i][0] == '+';
+            int op_bit = operations[prm];
+            int old_permissions;
+            
+            char *query = new char[QUERY_MAX], *res = new char[PRM_MAX], *err = NULL;
+            sprintf(query, "select exists(select * from %s where file_id = (select id from file_list where path = \"%s\") and id = %s);", table.c_str(), path.c_str(), id.c_str());
+            sqlite3_exec(db, query, prm_callback, res, &err);
+            if (res[0] == '1'){
+                sprintf(query, "select prms from %s where file_id = (select id from file_list where path = \"%s\") and id = %s;", table.c_str(), path.c_str(), id.c_str());
+                sqlite3_exec(db, query, prm_callback, res, &err);
+                old_permissions = atoi(res);
+            }else{
+                if (get_field(path.c_str(), tfield.c_str()) == atoi(id.c_str())){
+                    old_permissions = get_field(path.c_str(), field.c_str());
+                }else{
+                    old_permissions = get_field(path.c_str(), "other_prms");
+                }
+            }
+            
+            sprintf(query, "insert or replace into %s (file_id, id, prms) values((select id from file_list where path = \"%s\"), %s, %d)", table.c_str(), path.c_str(), id.c_str(), get_new_prm(old_permissions, op_bit, op));
+            sqlite3_exec(db, query, NULL, NULL, &err);
+            delete [] query;
+            delete [] res;
+        }
     }
     
     return 0;

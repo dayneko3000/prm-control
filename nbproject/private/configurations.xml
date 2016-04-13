@@ -17,7 +17,8 @@
         </gdb_signals>
         <gdb_options>
           <DebugOptions>
-            <option name="debug_command" value="${OUTPUT_PATH} prm.dblite --show"/>
+            <option name="debug_command"
+                    value="${OUTPUT_PATH} FTDB.db --c -u / 1000 +rename"/>
           </DebugOptions>
         </gdb_options>
         <gdb_buildfirst gdb_buildfirst_overriden="false" gdb_buildfirst_old="false"/>
