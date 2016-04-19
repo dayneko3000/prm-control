@@ -83,15 +83,25 @@ int get_op_num(const string op)
 
 int help()
 {
-    cout << "--h --help: printing this message" <<
-            "--configure: \n Command receives absolutely path to root, mount directories \nand path to data base created during mounting FACFS in same directory with mounting program \nas arguments for making a config file in program directory.\n" <<
-            "You have to --configure every time you move this program \nor make change in paths.\n" <<
-            "--show:\n The command receives absolute or relative to mount directory \npath of file or directory in mount directory as argument for printing \n" <<
-            "information of permissions belongs to given file or directory. \nAlso command could take \"all\" as argument for printing all information data base contains.\n" <<
-            "--set:\n That command you could use for setting individual permissions \nor changing owner and not owner permissions by sending a permission mask.\nCommand receives three arguments in strong order.\nAbsolute or relative to mount directory path of file \nor directory in mount directory as first argument,\n" <<
-            "uid of user as second and permission mask as third. \nYou could use -4 and -5 as uid for setting owner and not owner permissions. \nFor directories path with \"/\" in the end is responsible for permissions of operations inside the directory \nwhereas path with no \"/\" is for permissions of operaions with the directory\n" <<
-            "Permission mask is string that contains only plus and minus symbols and must be 30 symbols long.\nCommand is stable to wrong arguments and lets you know what wrong you do.\n" <<
-            "--c --change\n Receives path, uid, list of \"+-permission type\"\n\n";
+    cout << "[command <command args>]\n" << 
+            "commands:\n"
+            "--h --help:                                                   printing this message\n" <<
+            "--show [path to database, \"\"|\"all\"|file/directory path]:      printing information db contains\n" <<
+            "--set [path to database, option, <option args>]:              set permissions of file by permission mask\n\toptions:\n" << 
+            "\t-ow [file/directory path, permission mask]:           set permissions for file owner\n" <<
+            "\t-gow [file/directory path, permission mask]:          set permissions for file group\n" <<
+            "\t-oth [file/directory path, permission mask]:          set permissions for other\n" <<
+            "\t-g [file/directory path, gid, permission mask]:       set individual permissions for group\n" <<
+            "\t-u [file/directory path, uid, permission mask]:       set individual permissions for user\n" <<
+            "example: --set /home/user/Desktop/FTDB.db -u /abc.txt 1000 67108863\n\n" <<
+            "--c --change [path to database, option, <option args>]:       add/remove permission by type\n\toptions:\n" <<
+            "\t-ow [file/directory path, <+-permission type>]:       change permissions of owner\n" <<
+            "\t-gow [file/directory path, <+-permission type>]:      change permissions of file group\n" <<
+            "\t-oth [file/directory path, <+-permission type>]:      change permissions of other\n" <<
+            "\t-g [file/directory path, gid, <+-permission type>]:   change individual permissions of group\n" <<
+            "\t-u [file/directory path, uid, <+-permission type>]:   change individual permissions of user\n" <<
+            "example: --c /home/user/Desktop/FTDB.db -u /abc.txt 1000 +write -rename -delete\n" <<
+            "\n";
     return 0;
 }
 
@@ -120,10 +130,12 @@ int configure(char *db_path)
     
     rootdir = res[0];
     
+    setuid(1);
+    
     return 0;
 }
 
-int check_path(string path)
+int checkPath(string path)
 {
     struct stat *stat_buf = new struct stat;
     if (lstat((rootdir + path).c_str(), stat_buf) != 0)
@@ -143,7 +155,7 @@ int check_uid(string uid)
     {
         if (!(isdigit(uid[i])))
         {
-            cout << "Wrong uid" << endl;
+            cout << "Wrong id" << endl;
             return 0;
         }
     }
@@ -151,16 +163,11 @@ int check_uid(string uid)
     return 1;
 }
 
-int check_prms(string prms)
+int checkPermissions(string prms)
 {
-//    if (prms.length() != 30)
-//    {
-//        cout << "Wrong permission mask" << endl;
-//        return 0;
-//    }
     for (int i = 0; i < prms.length(); i ++)
     {
-        if (prms[i] != '0' && prms[i] != '1')
+        if (!isdigit(prms[i]))
         {
             cout << "Wrong permission mask" << endl;
             return 0;
@@ -174,43 +181,35 @@ int show(int n, char **path){
     string query;
     char *err = 0;
     
-    if (n < 2 || string(path[1]) == "all")
+    if (n < 1 || string(path[0]) == "all")
         query = "select id, path, uid, gid, owner_prms, group_prms, other_prms from file_list;";
     else
     {
-        string p(path[1]);
+        string p(path[0]);
         
-        if (!check_path(p))
+        if (!checkPath(p))
             return 0;
         
         query = "select id, path, uid, gid, owner_prms, group_prms, other_prms from file_list where path =\"" + p + "\";";
     }
     
-    if (!(sqlite3_exec(db, query.c_str(), print_callback, NULL, &err) == SQLITE_OK))
-    {
-        cout << "Wrong data base path" << endl;
-        return 0;
-    }
+    (sqlite3_exec(db, query.c_str(), print_callback, NULL, &err) == SQLITE_OK);
     
     sqlite3_close(db);
 }
 
-
-
 int set(int n, char **argv)
 {
-    if (n < 4)
+    if (n < 3)
     {
         cout << "Not enough arguments" << endl;
         return 0;
     }
     
-    string mode(argv[1]), path(argv[2]), uid(argv[3]), prms(argv[4]);
+    string mode(argv[0]), path(argv[1]), uid, prms(argv[2]);
     
-    if (!check_path(path) || !check_prms(prms))
+    if (!checkPath(path) || !checkPermissions(prms))
         return 0;
-//    char prm[30];
-//    sprintf(prm, "%d",  bitset<30>(prms).to_ulong());
     string query;
     //query = "insert or replace into prm_list values(\"" + path +"\", " + uid + ", " + prms + ");";
     if (mode == "-ow")
@@ -219,12 +218,22 @@ int set(int n, char **argv)
         query = "update file_list set group_prms = " + prms + " where path = " + path + ";";
     else if(mode == "-oth")
         query = "update file_list set other_prms = " + prms + " where path = " + path + ";";
-    else if(mode == "-g" && check_uid(uid))
-        query = "insert or replace into group_prm_list (file_id, id, prms) values((select id from file_list where path = \"" + path + "\"), " + uid + ", " + prms + ");";
-    else if (check_uid(uid))
-        query = "insert or replace into user_prm_list (file_id, id, prms) values((select id from file_list where path = \"" + path + "\"), " + uid + ", " + prms + ");";
     else 
-        return 0;
+    {
+        if (n < 4)
+        {
+            cout << "Not enough arguments" << endl;
+            return 0;
+        }
+        
+        uid = string(argv[3]);
+        if(mode == "-g" && check_uid(uid))
+            query = "insert or replace into group_prm_list (file_id, id, prms) values((select id from file_list where path = \"" + path + "\"), " + uid + ", " + prms + ");";
+        else if (mode == "-u" && check_uid(uid))
+            query = "insert or replace into user_prm_list (file_id, id, prms) values((select id from file_list where path = \"" + path + "\"), " + uid + ", " + prms + ");";
+        else 
+            return 0;
+    }
     
     char *err = 0;
     if (!(sqlite3_exec(db, query.c_str(), NULL, NULL, &err) == SQLITE_OK))
@@ -240,16 +249,12 @@ int set(int n, char **argv)
 int get_new_prm(int prm, int bit, int op)
 {
     if (op)
-    {
         return prm | bit;
-    }
     else
-    {
         if ((prm & bit) != 0)
             return prm - bit;
         else
             return prm;
-    }
 }
 
 int get_field(const char *file, const char *field)
@@ -275,35 +280,43 @@ int change(int n, char **argv)
     if (n < 3)
         return 0;
     
-    path = string(argv[2]);
-    id = string(argv[1]);
+    path = string(argv[1]);
+    id = string(argv[0]);
     
     table = "file_list";
-    if (id == "-owner")
+    if (id == "-ow")
         field = "owner_prms";
-    else if (id == "-group")
+    else if (id == "-gown")
         field = "group_prms";
-    else if(id == "-other")
+    else if(id == "-oth")
         field = "other_prms";
-    else if (n >= 5){
-        if (id == "-g"){
-            table = "group_prm_list";
-            field = "group_prms";
-            tfield = "gid";
-        }else{
-            table = "user_prm_list";
-            field = "owner_prms";
-            tfield = "uid";
+    else 
+        if (n >= 5)
+        {
+            if (id == "-g")
+            {
+                table = "group_prm_list";
+                field = "group_prms";
+                tfield = "gid";
+            }
+            else
+            {
+                table = "user_prm_list";
+                field = "owner_prms";
+                tfield = "uid";
+            }
+            id = argv[2];
         }
-        id = argv[3];
-    }else return 0;
+        else 
+            return 0;
     
     if (table == "file_list"){
-        for (int i = 3; i < n; i ++){
+        for (int i = 2; i < n; i ++){
             string prm = argv[i];
             prm.erase(0, 1);
             if (operations.find(prm) == operations.end())
                 continue;
+            
             int op = argv[i][0] == '+';
             int op_bit = operations[prm];
             int old_permissions = get_field(path.c_str(), field.c_str());
@@ -314,7 +327,7 @@ int change(int n, char **argv)
             delete [] query;
         }
     }else{
-        for (int i = 4; i < n; i ++){
+        for (int i = 3; i < n; i ++){
             string prm = argv[i];
             prm.erase(0, 1);
             if (operations.find(prm) == operations.end())
@@ -330,16 +343,18 @@ int change(int n, char **argv)
                 sprintf(query, "select prms from %s where file_id = (select id from file_list where path = \"%s\") and id = %s;", table.c_str(), path.c_str(), id.c_str());
                 sqlite3_exec(db, query, prm_callback, res, &err);
                 old_permissions = atoi(res);
-            }else{
-                if (get_field(path.c_str(), tfield.c_str()) == atoi(id.c_str())){
+            }
+            else
+            {
+                if (get_field(path.c_str(), tfield.c_str()) == atoi(id.c_str()))
                     old_permissions = get_field(path.c_str(), field.c_str());
-                }else{
+                else
                     old_permissions = get_field(path.c_str(), "other_prms");
-                }
             }
             
             sprintf(query, "insert or replace into %s (file_id, id, prms) values((select id from file_list where path = \"%s\"), %s, %d)", table.c_str(), path.c_str(), id.c_str(), get_new_prm(old_permissions, op_bit, op));
             sqlite3_exec(db, query, NULL, NULL, &err);
+            
             delete [] query;
             delete [] res;
         }
@@ -353,39 +368,28 @@ int change(int n, char **argv)
  */
 int main(int argc, char **argv) 
 {
-    argv ++;
-    argc --;
     if (argc < 1)
         return 0;
     
-    map <string, int> comands = {{"--help", 0},
-                                {"--h", 0},
-                                {"--show", 2},
-                                {"--set", 3},
-                                {"--c", 4},
-                                {"--change", 4}};
-    
-    configure(argv[0]);
-    
-    argv++;
-    argc--;
-    
-    if (comands.find(string(argv[0])) == comands.end())
+    if (comands.find(string(argv[1])) == comands.end())
     {
         cout << "Undefined operation" << endl;
         return 0;
     }
     
-    switch (comands[string(argv[0])])
+    switch (comands[string(argv[1])])
     {
         case 0:
             return help();
         case 2:
-            return show(argc, argv);
+            configure(argv[2]);
+            return show(argc - 2, argv + 2);
         case 3:
-            return set(argc, argv);
+            configure(argv[2]);
+            return set(argc - 2, argv + 2);
         case 4:
-            return change(argc, argv);
+            configure(argv[2]);
+            return change(argc - 2, argv + 2);
         default:
             return 0;
     }

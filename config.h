@@ -22,6 +22,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <bitset>
+#include <unistd.h>
 
 #ifndef CONFIG_H
 #define CONFIG_H
@@ -34,11 +35,46 @@ extern "C" {
 #define PRM_MAX 50    
     
 std::map<std::string, int> operations = 
-{{"execute", 1 << 0}, {"getattr", 1 << 1}, {"chmod", 1 << 2}, {"fsyncdir", 1 << 3}, {"truncate", 1 << 4},
-{"chown", 1 << 5}, {"fsync", 1 << 6}, {"utime", 1 << 7}, {"readlink", 1 << 8}, {"unlink", 1 << 9},
-{"symlink", 1 << 10}, {"rename", 1 << 11}, {"link", 1 << 12}, {"ftruncate", 1 << 13}, {"fgetattr", 1 << 14},
-{"open", 1 << 15}, {"read", 1 << 16}, {"write", 1 << 17}, {"statfs", 1 << 18}, {"rmdir", 1 << 19},
-{"mknod", 1 << 20}, {"mkdir", 1 << 21}, {"opendir", 1 << 22}, {"readdir", 1 << 23}, {"create", 1 << 24}};
+    {{"execute", 1 << 0}, 
+    {"getattr", 1 << 1}, 
+    {"chmod", 1 << 2}, 
+    {"fsyncdir", 1 << 3}, 
+    {"truncate", 1 << 4},
+    {"chown", 1 << 5}, 
+    {"fsync", 1 << 6}, 
+    {"utime", 1 << 7}, 
+    {"readlink", 1 << 8}, 
+    {"unlink", 1 << 9},
+    {"symlink", 1 << 10}, 
+    {"rename", 1 << 11}, 
+    {"link", 1 << 12}, 
+    {"ftruncate", 1 << 13}, 
+    {"fgetattr", 1 << 14},
+    {"open", 1 << 15}, 
+    {"read", 1 << 16}, 
+    {"write", 1 << 17}, 
+    {"statfs", 1 << 18}, 
+    {"rmdir", 1 << 19},
+    {"mknod", 1 << 20}, 
+    {"mkdir", 1 << 21}, 
+    {"opendir", 1 << 22}, 
+    {"readdir", 1 << 23}, 
+    {"create", 1 << 24}};
+
+std::map <std::string, int> comands = 
+    {{"--help", 0},
+    {"--h", 0},
+    {"--show", 2},
+    {"--set", 3},
+    {"--c", 4},
+    {"--change", 4}};
+
+std::map <std::string, std::string> mode = 
+    {{"-ow", "owner_prms"},
+    {"-gow", "group_prms"},
+    {"-oth", "other_prms"},
+    {"-u", 4},
+    {"--change", 4}};
 
 #ifdef __cplusplus
 }
